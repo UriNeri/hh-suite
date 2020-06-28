@@ -313,9 +313,9 @@ void HitList::PrintM8File(HMM* q, std::stringstream& outbuffer, const int nhits,
                 isGapOpen = false;
             }
         }
-        sprintf(line, "%s\t%s\t%1.3f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%.2E\t%.1f\n",
-                q->name, hit.file, static_cast<float>(matchCount)/static_cast<float>(hit.L), hit.L, missMatchCount, gapOpenCount,
-                hit.i1, hit.i2, hit.j1, hit.j2, hit.Eval, -hit.score_aass);
+        sprintf(line, "%s\t%s\t%1.3f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%.1f\t%.2E\t%.1f\n",
+                q->name, hit.file, static_cast<float>(matchCount)/static_cast<float>(hit.L), hit.L, q->L, missMatchCount, gapOpenCount,
+                hit.i1, hit.i2, hit.j1, hit.j2, hit.Probab, hit.Eval, -hit.score_aass);
         outbuffer << line;
     }
 }
