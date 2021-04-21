@@ -97,6 +97,7 @@ void HHalign::help(Parameters& par, char all) {
   printf("\n");
 
   printf("Filter options applied to query MSA, template MSA, and result MSA              \n");
+  printf(" -all           show all sequences in result MSA; do not filter result MSA      \n");
   printf(" -id   [0,100]  maximum pairwise sequence identity (def=%i)\n", par.max_seqid);
   printf(" -diff [0,inf[  filter MSAs by selecting most diverse set of sequences, keeping \n");
   printf("                at least this many seqs in each MSA block of length 50 \n");
@@ -211,11 +212,12 @@ void HHalign::ProcessAllArguments(Parameters& par) {
   par.B = 100;                   // max number of alignments
   par.z = 1;                     // min number of lines in hit list
   par.Z = 100;                   // max number of lines in hit list
+  par.e = 100000;
   par.append = 0;              // append alignment to output file with -a option
   par.altali = 1;           // find only ONE (possibly overlapping) subalignment
   par.outformat = 3;             // default output format for alignment is a3m
   par.realign = 1;               // default: realign
-
+  par.premerge = 0;
   par.num_rounds = 1;
 
   ProcessArguments(par);
@@ -294,7 +296,9 @@ void HHalign::ProcessArguments(Parameters& par) {
       else
         strcpy(par.pairwisealisfile, argv[i]);
     }
-    else if (!strcmp(argv[i], "-Oa3m")) {
+    else if (!strcmp(argv[i], "-all") || !strcmp(argv[i], "-nodiff")) {
+        par.allseqs = true;
+    } else if (!strcmp(argv[i], "-Oa3m")) {
       par.outformat = 3;
       if (++i >= argc || argv[i][0] == '-') {
         help(par);
@@ -596,6 +600,7 @@ void HHalign::run(FILE* query_fh, char* query_path) {
 
   Hit hit_cur;
   Hash<Hit>* previous_hits = new Hash<Hit>(1631, hit_cur);
+  Hash<Hit>* premerged_hits = new Hash<Hit>(1631, hit_cur);
 
   Qali = new Alignment(par.maxseq, par.maxres);
   Qali_allseqs = new Alignment(par.maxseq, par.maxres);
@@ -607,8 +612,15 @@ void HHalign::run(FILE* query_fh, char* query_path) {
   // Read input file (HMM, HHM, or alignment format), and add pseudocounts etc.
   Qali->N_in = 0;
   char input_format = 0;
-  ReadQueryFile(par, query_fh, input_format, par.wg, q, Qali, query_path, pb,
-          S, Sim);
+  ReadQueryFile(par, query_fh, input_format, par.wg, q, Qali, query_path, pb, S, Sim);
+
+  if (par.allseqs) {
+    *Qali_allseqs = *Qali;  // make a *deep* copy of Qali!
+    for (int k = 0; k < Qali_allseqs->N_in; ++k){
+        Qali_allseqs->keep[k] = 1;  // keep *all* sequences (reset filtering in Qali)
+    }
+  }
+
   PrepareQueryHMM(par, input_format, q, pc_hhm_context_engine,
           pc_hhm_context_mode, pb, R);
   q_vec.MapOneHMM(q);
@@ -643,7 +655,7 @@ void HHalign::run(FILE* query_fh, char* query_path) {
       perform_realign(q_vec, input_format, new_entries, 1);
   }
 
-  mergeHitsToQuery(previous_hits, seqs_found, cluster_found, 1);
+  mergeHitsToQuery(hitlist, previous_hits, premerged_hits, seqs_found, cluster_found, 1);
 
   // Calculate pos-specific weights, AA frequencies and transitions -> f[i][a], tr[i][a]
   Qali->FrequenciesAndTransitions(q, par.wg, par.mark, par.cons, par.showcons, pb, Sim, NULL, true);
@@ -660,4 +672,5 @@ void HHalign::run(FILE* query_fh, char* query_path) {
   while (!previous_hits->End())
     previous_hits->ReadNext().Delete(); // Delete hit object
   delete previous_hits;
+  delete premerged_hits;
 }
